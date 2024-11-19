@@ -22,35 +22,39 @@ jobs:
       run: |
         RANDOM_NUMBER=$(( RANDOM ))
         echo "Random number: $RANDOM_NUMBER at $(date)" >> random_numbers.txt
-        echo "::set-output name=random_number::$RANDOM_NUMBER"
+        echo "random_number=$RANDOM_NUMBER" >> $GITHUB_OUTPUT
         git config --global user.email "you@example.com"
         git config --global user.name "Your Name"
         git add random_numbers.txt
         git commit -m "Logged random number $RANDOM_NUMBER - This number is so cool, it can make ice jealous!"
 
     - name: Generate random string
+      id: random_string
       run: |
         RANDOM_STRING=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
         echo "Random string: $RANDOM_STRING at $(date)" >> random_strings.txt
+        echo "random_string=$RANDOM_STRING" >> $GITHUB_OUTPUT
         git add random_strings.txt
         git commit -m "Logged random string $RANDOM_STRING - This string is so random, even a cat couldn't predict it!"
 
     - name: Push changes
       run: |
-        git push
+        git push || echo "Failed to push changes"
 
     - name: Install mailutils
       run: sudo apt-get install -y mailutils
 
     - name: Send notification
       run: |
-        echo "Random number ${{ steps.random_number.outputs.random_number }} and string $RANDOM_STRING have been logged. It's so legendary, even unicorns are impressed!" | mail -s "Legendary Log Notification" you@example.com
+        echo "Random number ${{ steps.random_number.outputs.random_number }} and string ${{ steps.random_string.outputs.random_string }} have been logged. It's so legendary, even unicorns are impressed!" | mail -s "Legendary Log Notification" you@example.com
 
     - name: Fetch a random joke
+      id: random_joke
       run: |
         sudo apt-get install -y jq
         JOKE=$(curl -s https://official-joke-api.appspot.com/jokes/random | jq -r '.setup + " - " + .punchline')
         echo "Random joke: $JOKE at $(date)" >> jokes.txt
+        echo "joke=$JOKE" >> $GITHUB_OUTPUT
         git add jokes.txt
         git commit -m "Logged random joke - $JOKE"
 
@@ -69,13 +73,18 @@ jobs:
         echo "Meme generated at $(date)" >> memes.txt
         git add meme.png memes.txt
         git commit -m "Generated meme - This meme is so legendary, even Chuck Norris approves!"
-        git push
+        git push || echo "Failed to push meme"
 
     - name: Post to Slack
+      if: env.SLACK_WEBHOOK_URL != ''
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"Random number: ${{ steps.random_number.outputs.random_number }} and random string: $RANDOM_STRING. Also, here is a joke for you: $JOKE"}' $SLACK_WEBHOOK_URL
+        if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Random number: ${{ steps.random_number.outputs.random_number }} and random string: ${{ steps.random_string.outputs.random_string }}. Also, here is a joke for you: ${{ steps.random_joke.outputs.joke }}\"}" $SLACK_WEBHOOK_URL
+        else
+          echo "Skipping Slack notification as SLACK_WEBHOOK_URL is not set"
+        fi
 
     - name: Create issue if random number is above threshold
       if: ${{ steps.random_number.outputs.random_number > 50000 }}
@@ -96,7 +105,7 @@ jobs:
         echo "Random quote: $QUOTE at $(date)" >> quotes.txt
         git add quotes.txt
         git commit -m "Logged random quote - Wisdom so deep, it makes philosophers dizzy!"
-        git push
+        git push || echo "Failed to push quote"
 
     - name: Generate a random fact
       run: |
@@ -104,7 +113,7 @@ jobs:
         echo "Random fact: $FACT at $(date)" >> facts.txt
         git add facts.txt
         git commit -m "Logged random fact - Knowledge so random, it confuses encyclopedias!"
-        git push
+        git push || echo "Failed to push fact"
 
     - name: Final push
       run: |
