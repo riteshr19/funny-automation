@@ -53,9 +53,14 @@ jobs:
         git add jokes.txt
         git commit -m "Logged random joke - $JOKE"
 
+    - name: Install ImageMagick and fonts
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y imagemagick ttf-mscorefonts-installer
+        sudo fc-cache -f -v
+
     - name: Generate meme
       run: |
-        sudo apt-get update && sudo apt-get install -y imagemagick
         convert -size 800x200 xc:white -font Arial -pointsize 72 -fill black -draw "text 10,100 'Legendary Automation!'" meme.png
         echo "Meme generated at $(date)" >> memes.txt
         git add meme.png memes.txt
