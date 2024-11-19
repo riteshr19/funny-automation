@@ -2,11 +2,12 @@ name: Legendary Automation
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Adjust this cron schedule for more randomness
+    - cron: '0 0 * * *'  # Runs daily at midnight
   workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   legendary-job:
@@ -56,12 +57,15 @@ jobs:
     - name: Install ImageMagick and fonts
       run: |
         sudo apt-get update
-        sudo apt-get install -y imagemagick ttf-mscorefonts-installer
+        sudo apt-get install -y imagemagick fonts-dejavu
         sudo fc-cache -f -v
 
     - name: Generate meme
       run: |
-        convert -size 800x200 xc:white -font Arial -pointsize 72 -fill black -draw "text 10,100 'Legendary Automation!'" meme.png
+        MEME_TEXT="Legendary Automation!"
+        FONT_SIZE=$((RANDOM % 30 + 60))  # Random font size between 60 and 90
+        COLOR=$(printf '#%06X\n' $((RANDOM % 16777215)))  # Random color
+        convert -size 800x200 xc:white -font DejaVu-Sans -pointsize $FONT_SIZE -fill "$COLOR" -draw "text 10,100 '$MEME_TEXT'" meme.png
         echo "Meme generated at $(date)" >> memes.txt
         git add meme.png memes.txt
         git commit -m "Generated meme - This meme is so legendary, even Chuck Norris approves!"
@@ -77,6 +81,7 @@ jobs:
       if: ${{ steps.random_number.outputs.random_number > 50000 }}
       uses: actions/github-script@v3
       with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
           github.issues.create({
             owner: context.repo.owner,
@@ -84,3 +89,23 @@ jobs:
             title: 'High Random Number Alert',
             body: `A high random number ${{ steps.random_number.outputs.random_number }} was generated. It's so high, even the sky is jealous!`
           })
+
+    - name: Fetch and log a random quote
+      run: |
+        QUOTE=$(curl -s https://api.quotable.io/random | jq -r '.content + " - " + .author')
+        echo "Random quote: $QUOTE at $(date)" >> quotes.txt
+        git add quotes.txt
+        git commit -m "Logged random quote - Wisdom so deep, it makes philosophers dizzy!"
+        git push
+
+    - name: Generate a random fact
+      run: |
+        FACT=$(curl -s "https://uselessfacts.jsph.pl/random.json?language=en" | jq -r '.text')
+        echo "Random fact: $FACT at $(date)" >> facts.txt
+        git add facts.txt
+        git commit -m "Logged random fact - Knowledge so random, it confuses encyclopedias!"
+        git push
+
+    - name: Final push
+      run: |
+        git push || echo "No changes to push"
