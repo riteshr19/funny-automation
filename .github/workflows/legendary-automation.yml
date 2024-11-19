@@ -17,6 +17,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Update CA certificates
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates curl
+        sudo update-ca-certificates
+
     - name: Generate random number and log to file
       id: random_number
       run: |
@@ -57,7 +63,7 @@ jobs:
         JOKE=""
         
         while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$JOKE" ]; do
-          RESPONSE=$(curl -s https://official-joke-api.appspot.com/jokes/random)
+          RESPONSE=$(curl -s --retry 3 --retry-delay 5 --max-time 30 https://official-joke-api.appspot.com/jokes/random || echo '{"setup": "Why did the API fail?", "punchline": "It was feeling a bit insecure!"}')
           if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
             JOKE=$(echo "$RESPONSE" | jq -r '.setup + " - " + .punchline')
           else
@@ -126,7 +132,7 @@ jobs:
         QUOTE=""
         
         while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$QUOTE" ]; do
-          RESPONSE=$(curl -s https://api.quotable.io/random)
+          RESPONSE=$(curl -s --retry 3 --retry-delay 5 --max-time 30 https://api.quotable.io/random || echo '{"content": "Automation is the art of making processes work for you", "author": "Unknown"}')
           if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
             QUOTE=$(echo "$RESPONSE" | jq -r '.content + " - " + .author')
           else
@@ -152,7 +158,7 @@ jobs:
         FACT=""
         
         while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$FACT" ]; do
-          RESPONSE=$(curl -s "https://uselessfacts.jsph.pl/random.json?language=en")
+          RESPONSE=$(curl -s --retry 3 --retry-delay 5 --max-time 30 "https://uselessfacts.jsph.pl/random.json?language=en" || echo '{"text": "GitHub Actions can handle API failures gracefully!"}')
           if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
             FACT=$(echo "$RESPONSE" | jq -r '.text')
           else
@@ -163,7 +169,7 @@ jobs:
         done
         
         if [ -z "$FACT" ]; then
-          FACT="Did you know? GitHub Actions can handle API failures gracefully!"
+          FACT="Did you know? Sometimes, even random facts can be elusive!"
         fi
         
         echo "Random fact: $FACT at $(date)" >> facts.txt
