@@ -1,0 +1,74 @@
+name: Legendary Automation
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Adjust this cron schedule for more randomness
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  legendary-job:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Generate random number and log to file
+      id: random_number
+      run: |
+        RANDOM_NUMBER=$(( RANDOM ))
+        echo "Random number: $RANDOM_NUMBER at $(date)" >> random_numbers.txt
+        echo "::set-output name=random_number::$RANDOM_NUMBER"
+        git config --global user.email "you@example.com"
+        git config --global user.name "Your Name"
+        git add random_numbers.txt
+        git commit -m "Logged random number $RANDOM_NUMBER"
+
+    - name: Generate random string
+      run: |
+        RANDOM_STRING=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
+        echo "Random string: $RANDOM_STRING at $(date)" >> random_strings.txt
+        git add random_strings.txt
+        git commit -m "Logged random string $RANDOM_STRING"
+
+    - name: Push changes
+      run: |
+        git push
+
+    - name: Send notification
+      run: |
+        echo "Random number ${{ steps.random_number.outputs.random_number }} and string $RANDOM_STRING have been logged." | mail -s "Legendary Log Notification" you@example.com
+
+    - name: Run custom script
+      run: |
+        ./your-custom-script.sh
+
+    - name: Generate meme
+      run: |
+        sudo apt-get update && sudo apt-get install -y imagemagick
+        convert -size 800x200 xc:white -font Arial -pointsize 72 -fill black -draw "text 10,100 'Legendary Automation!'" meme.png
+        echo "Meme generated at $(date)" >> memes.txt
+        git add meme.png memes.txt
+        git commit -m "Generated meme"
+        git push
+
+    - name: Post to Slack
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        curl -X POST -H 'Content-type: application/json' --data '{"text":"Random number: ${{ steps.random_number.outputs.random_number }} and random string: $RANDOM_STRING"}' $SLACK_WEBHOOK_URL
+
+    - name: Create issue if random number is above threshold
+      if: ${{ steps.random_number.outputs.random_number > 50000 }}
+      uses: actions/github-script@v3
+      with:
+        script: |
+          github.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'High Random Number Alert',
+            body: `A high random number ${{ steps.random_number.outputs.random_number }} was generated.`
+          })
