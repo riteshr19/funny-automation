@@ -1,0 +1,86 @@
+name: Multi-Cloud Deployment with Chaos Engineering
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-west-2
+
+      - name: Set up Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Set up GCP SDK
+        run: |
+          echo ${{ secrets.GCP_KEY }} | base64 --decode > ${HOME}/gcp-key.json
+          gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+  deploy:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to AWS
+        run: |
+          aws s3 cp my-app.zip s3://my-bucket/my-app.zip
+          aws elasticbeanstalk create-application-version --application-name my-app --version-label v1 --source-bundle S3Bucket="my-bucket",S3Key="my-app.zip"
+          aws elasticbeanstalk update-environment --environment-name my-env --version-label v1
+
+      - name: Deploy to Azure
+        run: |
+          az webapp deployment source config-zip --resource-group myResourceGroup --name myApp --src my-app.zip
+
+      - name: Deploy to GCP
+        run: |
+          gcloud app deploy my-app.yaml --quiet
+
+  chaos:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Chaos Mesh
+        run: |
+          kubectl apply -f https://mirrors.chaos-mesh.org/latest/chaos-mesh.yaml
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n chaos-testing
+
+      - name: Inject Chaos
+        run: |
+          kubectl apply -f chaos-experiment.yaml
+
+      - name: Collect Logs
+        run: |
+          kubectl logs -l app=my-app -n chaos-testing > chaos-logs.txt
+          cat chaos-logs.txt
+
+  report:
+    needs: chaos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Report
+        run: |
+          echo "Chaos Engineering Report" > report.md
+          echo "========================" >> report.md
+          cat chaos-logs.txt >> report.md
+          echo "Report generated successfully."
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v2
+        with:
+          name: chaos-report
+          path: report.md
