@@ -1,3 +1,4 @@
+
 name: Legendary Automation
 
 on:
@@ -37,6 +38,9 @@ jobs:
     - name: Push changes
       run: |
         git push
+
+    - name: Install mailutils
+      run: sudo apt-get install -y mailutils
 
     - name: Send notification
       run: |
