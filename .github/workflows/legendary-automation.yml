@@ -46,13 +46,31 @@ jobs:
 
     - name: Send notification
       run: |
-        echo "Random number ${{ steps.random_number.outputs.random_number }} and string ${{ steps.random_string.outputs.random_string }} have been logged. It's so legendary, even unicorns are impressed!" | mail -s "Legendary Log Notification" you@example.com
+        echo "Random number ${{ steps.random_number.outputs.random_number }} and string ${{ steps.random_string.outputs.random_string }} have been logged. It's so legendary, even unicorns are impressed!" | mail -s "Legendary Log Notification" you@example.com || echo "Failed to send email"
 
     - name: Fetch a random joke
       id: random_joke
       run: |
         sudo apt-get install -y jq
-        JOKE=$(curl -s https://official-joke-api.appspot.com/jokes/random | jq -r '.setup + " - " + .punchline')
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        JOKE=""
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$JOKE" ]; do
+          RESPONSE=$(curl -s https://official-joke-api.appspot.com/jokes/random)
+          if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            JOKE=$(echo "$RESPONSE" | jq -r '.setup + " - " + .punchline')
+          else
+            echo "Failed to fetch or parse joke, retrying..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            sleep 5
+          fi
+        done
+        
+        if [ -z "$JOKE" ]; then
+          JOKE="Why did the GitHub Action cross the road? To trigger the other workflow!"
+        fi
+        
         echo "Random joke: $JOKE at $(date)" >> jokes.txt
         echo "joke=$JOKE" >> $GITHUB_OUTPUT
         git add jokes.txt
@@ -69,7 +87,7 @@ jobs:
         MEME_TEXT="Legendary Automation!"
         FONT_SIZE=$((RANDOM % 30 + 60))  # Random font size between 60 and 90
         COLOR=$(printf '#%06X\n' $((RANDOM % 16777215)))  # Random color
-        convert -size 800x200 xc:white -font DejaVu-Sans -pointsize $FONT_SIZE -fill "$COLOR" -draw "text 10,100 '$MEME_TEXT'" meme.png
+        convert -size 800x200 xc:white -font DejaVu-Sans -pointsize $FONT_SIZE -fill "$COLOR" -draw "text 10,100 '$MEME_TEXT'" meme.png || echo "Failed to generate meme"
         echo "Meme generated at $(date)" >> memes.txt
         git add meme.png memes.txt
         git commit -m "Generated meme - This meme is so legendary, even Chuck Norris approves!"
@@ -81,7 +99,7 @@ jobs:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
         if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Random number: ${{ steps.random_number.outputs.random_number }} and random string: ${{ steps.random_string.outputs.random_string }}. Also, here is a joke for you: ${{ steps.random_joke.outputs.joke }}\"}" $SLACK_WEBHOOK_URL
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Random number: ${{ steps.random_number.outputs.random_number }} and random string: ${{ steps.random_string.outputs.random_string }}. Also, here is a joke for you: ${{ steps.random_joke.outputs.joke }}\"}" $SLACK_WEBHOOK_URL || echo "Failed to post to Slack"
         else
           echo "Skipping Slack notification as SLACK_WEBHOOK_URL is not set"
         fi
@@ -97,11 +115,31 @@ jobs:
             repo: context.repo.repo,
             title: 'High Random Number Alert',
             body: `A high random number ${{ steps.random_number.outputs.random_number }} was generated. It's so high, even the sky is jealous!`
-          })
+          }).catch(error => {
+            console.error('Failed to create issue:', error);
+          });
 
     - name: Fetch and log a random quote
       run: |
-        QUOTE=$(curl -s https://api.quotable.io/random | jq -r '.content + " - " + .author')
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        QUOTE=""
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$QUOTE" ]; do
+          RESPONSE=$(curl -s https://api.quotable.io/random)
+          if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            QUOTE=$(echo "$RESPONSE" | jq -r '.content + " - " + .author')
+          else
+            echo "Failed to fetch or parse quote, retrying..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            sleep 5
+          fi
+        done
+        
+        if [ -z "$QUOTE" ]; then
+          QUOTE="Automation is the art of making processes work for you - Unknown"
+        fi
+        
         echo "Random quote: $QUOTE at $(date)" >> quotes.txt
         git add quotes.txt
         git commit -m "Logged random quote - Wisdom so deep, it makes philosophers dizzy!"
@@ -109,7 +147,25 @@ jobs:
 
     - name: Generate a random fact
       run: |
-        FACT=$(curl -s "https://uselessfacts.jsph.pl/random.json?language=en" | jq -r '.text')
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        FACT=""
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$FACT" ]; do
+          RESPONSE=$(curl -s "https://uselessfacts.jsph.pl/random.json?language=en")
+          if echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            FACT=$(echo "$RESPONSE" | jq -r '.text')
+          else
+            echo "Failed to fetch or parse fact, retrying..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            sleep 5
+          fi
+        done
+        
+        if [ -z "$FACT" ]; then
+          FACT="Did you know? GitHub Actions can handle API failures gracefully!"
+        fi
+        
         echo "Random fact: $FACT at $(date)" >> facts.txt
         git add facts.txt
         git commit -m "Logged random fact - Knowledge so random, it confuses encyclopedias!"
