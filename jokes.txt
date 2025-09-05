@@ -287,3 +287,4 @@ Random joke: When is a door not a door? - When it's ajar. at Mon Sep  1 01:12:09
 Random joke: What do you call a thieving alligator? - A crookodile! at Tue Sep  2 01:02:52 UTC 2025
 Random joke: What creature is smarter than a talking parrot? - A spelling bee. at Wed Sep  3 00:58:06 UTC 2025
 Random joke: What happens to a frog's car when it breaks down? - It gets toad away at Thu Sep  4 00:58:03 UTC 2025
+Random joke: Why couldn't the kid see the pirate movie? - Because it was rated arrr! at Fri Sep  5 00:59:54 UTC 2025
